@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour
 import net.minecraft.world.level.block.state.properties.BlockStateProperties
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 import net.minecraft.world.level.block.state.properties.Property
+import net.minecraft.world.level.block.SoundType
 import net.minecraft.world.level.material.PushReaction
 import net.minecraft.world.level.storage.loot.LootTable
 import net.minecraft.world.phys.AABB
@@ -240,8 +241,13 @@ class Blocks : SteelExtractor.Extractor {
             )
 
 
-            //val soundType = getPrivateFieldValue<SoundType>(behaviourProps, "soundType")
-            //behaviourJson.addProperty("soundType", soundType?.breakSound?.location?.toString()) // Assuming you want the enum name
+            val soundType = getPrivateFieldValue<SoundType>(behaviourProps, "soundType")
+            if (soundType != null) {
+                val soundTypeName = getConstantName(SoundType::class.java, soundType)
+                if (soundTypeName != null) {
+                    behaviourJson.addProperty("sound_type", soundTypeName)
+                }
+            }
 
             behaviourJson.addProperty("friction", getPrivateFieldValue<Float>(behaviourProps, "friction"))
             behaviourJson.addProperty("speedFactor", getPrivateFieldValue<Float>(behaviourProps, "speedFactor"))
