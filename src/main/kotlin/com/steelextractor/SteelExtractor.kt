@@ -17,6 +17,7 @@ import com.steelextractor.extractors.LevelEvents
 import com.steelextractor.extractors.SoundEvents
 import com.steelextractor.extractors.SoundTypes
 import com.steelextractor.extractors.Potions
+import com.steelextractor.extractors.Tags
 import kotlinx.io.IOException
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -61,7 +62,8 @@ object SteelExtractor : ModInitializer {
             Potions(),
             SoundTypes(),
             SoundEvents(),
-            LevelEvents()
+            LevelEvents(),
+            Tags()
         )
 
         val outputDirectory: Path
