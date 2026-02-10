@@ -9,6 +9,7 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.world.item.BlockItem
 import net.minecraft.world.item.StandingAndWallBlockItem
 import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.ButtonBlock
 import net.minecraft.world.level.block.LiquidBlock
 import org.slf4j.LoggerFactory
 
@@ -35,6 +36,24 @@ class Classes : SteelExtractor.Extractor {
                 fluidField.isAccessible = true
                 val fluid = fluidField.get(block) as net.minecraft.world.level.material.FlowingFluid
                 blockJson.addProperty("fluid", BuiltInRegistries.FLUID.getKey(fluid)?.path)
+            }
+
+            if (block is ButtonBlock) {
+                val ticksField = ButtonBlock::class.java.getDeclaredField("ticksToStayPressed")
+                ticksField.isAccessible = true
+                blockJson.addProperty("ticks_to_stay_pressed", ticksField.getInt(block))
+
+                val typeField = ButtonBlock::class.java.getDeclaredField("type")
+                typeField.isAccessible = true
+                val blockSetType = typeField.get(block) as net.minecraft.world.level.block.state.properties.BlockSetType
+                blockJson.addProperty("button_click_on",
+                    BuiltInRegistries.SOUND_EVENT.getKey(blockSetType.buttonClickOn())?.path?.replace(".", "_")
+                        ?.uppercase()
+                )
+                blockJson.addProperty("button_click_off",
+                    BuiltInRegistries.SOUND_EVENT.getKey(blockSetType.buttonClickOff())?.path?.replace(".", "_")
+                        ?.uppercase()
+                )
             }
 
             blocksJson.add(blockJson)
