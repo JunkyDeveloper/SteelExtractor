@@ -2,14 +2,16 @@ package com.steelextractor
 
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonElement
+import com.steelextractor.extractors.Attributes
 import com.steelextractor.extractors.Classes
 import com.steelextractor.extractors.BlockEntities
 import com.steelextractor.extractors.Blocks
 import com.steelextractor.extractors.Entities
-import com.steelextractor.extractors.EntityDataSerializersExtractor
+import com.steelextractor.extractors.Fluids
 import com.steelextractor.extractors.GameRulesExtractor
 import com.steelextractor.extractors.Items
 import com.steelextractor.extractors.MenuTypes
+import com.steelextractor.extractors.MobEffects
 import com.steelextractor.extractors.Packets
 import com.steelextractor.extractors.LevelEvents
 import com.steelextractor.extractors.SoundEvents
@@ -19,6 +21,8 @@ import com.steelextractor.extractors.BiomeHashes
 import com.steelextractor.extractors.ChunkStageHashes
 import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.chunk.status.ChunkStatus
+import com.steelextractor.extractors.Potions
+import com.steelextractor.extractors.Tags
 import kotlinx.io.IOException
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -53,14 +57,19 @@ object SteelExtractor : ModInitializer {
             Packets(),
             MenuTypes(),
             Entities(),
-            EntityDataSerializersExtractor(),
+            Fluids(),
             GameRulesExtractor(),
             Classes(),
-            LevelEvents(),
+            Attributes(),
+            MobEffects(),
+            Potions(),
+            SoundTypes(),
             SoundEvents(),
             SoundTypes(),
             OverworldBiomes(),
-            BiomeHashes()
+            BiomeHashes(),
+            LevelEvents(),
+            Tags()
         )
 
         val chunkStageExtractor = ChunkStageHashes()

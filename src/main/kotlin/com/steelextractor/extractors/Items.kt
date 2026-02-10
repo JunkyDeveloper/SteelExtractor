@@ -10,7 +10,12 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.RegistryOps
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.item.BlockItem
+import net.minecraft.world.item.SignItem
+import net.minecraft.world.item.StandingAndWallBlockItem
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.SignBlock
 import org.slf4j.LoggerFactory
+import java.lang.reflect.Field
 
 class Items : SteelExtractor.Extractor {
     private val logger = LoggerFactory.getLogger("steel-extractor-items")
@@ -57,6 +62,12 @@ class Items : SteelExtractor.Extractor {
 
             if (item is BlockItem) {
                 itemJson.addProperty("blockItem", BuiltInRegistries.BLOCK.getKey(item.block).path)
+            }
+            if (item is StandingAndWallBlockItem) {
+                itemJson.addProperty(
+                    "standingAndWallBlockItem",
+                    BuiltInRegistries.BLOCK.getKey(item.javaClass.getField("wallBlock").get(item) as Block).path
+                )
             }
 
             val temp = DataComponentMap.CODEC.encodeStart(

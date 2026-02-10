@@ -7,6 +7,9 @@ import com.steelextractor.SteelExtractor
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.item.BlockItem
+import net.minecraft.world.item.StandingAndWallBlockItem
+import net.minecraft.world.level.block.Block
+import net.minecraft.world.level.block.LiquidBlock
 import org.slf4j.LoggerFactory
 
 class Classes : SteelExtractor.Extractor {
@@ -27,6 +30,13 @@ class Classes : SteelExtractor.Extractor {
             blockJson.addProperty("name", name)
             blockJson.addProperty("class", block.javaClass.simpleName)
 
+            if (block is LiquidBlock) {
+                val fluidField = LiquidBlock::class.java.getDeclaredField("fluid")
+                fluidField.isAccessible = true
+                val fluid = fluidField.get(block) as net.minecraft.world.level.material.FlowingFluid
+                blockJson.addProperty("fluid", BuiltInRegistries.FLUID.getKey(fluid)?.path)
+            }
+
             blocksJson.add(blockJson)
         }
         topLevelJson.add("blocks", blocksJson)
@@ -41,6 +51,12 @@ class Classes : SteelExtractor.Extractor {
 
             if (item is BlockItem) {
                 itemJson.addProperty("block", BuiltInRegistries.BLOCK.getKey(item.block)?.path)
+            }
+            if (item is StandingAndWallBlockItem) {
+                itemJson.addProperty(
+                    "wallBlock",
+                    BuiltInRegistries.BLOCK.getKey(item.javaClass.getField("wallBlock").get(item) as Block)?.path
+                )
             }
 
             itemsJson.add(itemJson)
