@@ -15,6 +15,12 @@ class EntityEvents : SteelExtractor.Extractor {
 
     override fun extract(server: MinecraftServer): JsonElement {
         val topLevelJson = JsonArray()
+
+        val eventJson = JsonObject()
+        eventJson.addProperty("name", "tipped_arrow")
+        eventJson.addProperty("value", 0)
+        topLevelJson.add(eventJson)
+
         for (event in EntityEvent::class.staticProperties) {
             val eventJson = JsonObject()
             eventJson.addProperty("name", event.name.lowercase())
