@@ -7,6 +7,7 @@ import com.steelextractor.extractors.Classes
 import com.steelextractor.extractors.BlockEntities
 import com.steelextractor.extractors.Blocks
 import com.steelextractor.extractors.Entities
+import com.steelextractor.extractors.EntityEvents
 import com.steelextractor.extractors.Fluids
 import com.steelextractor.extractors.GameRulesExtractor
 import com.steelextractor.extractors.Items
@@ -54,6 +55,7 @@ object SteelExtractor : ModInitializer {
             Packets(),
             MenuTypes(),
             Entities(),
+            EntityEvents(),
             Fluids(),
             GameRulesExtractor(),
             Classes(),
