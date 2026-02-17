@@ -17,6 +17,7 @@ class EntityEvents : SteelExtractor.Extractor {
         val topLevelJson = JsonArray()
 
         val eventJson = JsonObject()
+        // In vanilla this event is hardcoded for some reason https://mcsrc.dev/1/26.1-snapshot-8/net/minecraft/world/entity/projectile/arrow/Arrow#L86
         eventJson.addProperty("name", "tipped_arrow")
         eventJson.addProperty("value", 0)
         topLevelJson.add(eventJson)
