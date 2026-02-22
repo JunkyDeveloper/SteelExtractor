@@ -63,18 +63,20 @@ class Classes : SteelExtractor.Extractor {
         val itemsJson = JsonArray()
         for (item in BuiltInRegistries.ITEM) {
             val itemJson = JsonObject()
-            val name = BuiltInRegistries.ITEM.getKey(item)?.path ?: "unknown"
+            val name = BuiltInRegistries.ITEM.getKey(item).path ?: "unknown"
 
             itemJson.addProperty("name", name)
             itemJson.addProperty("class", item.javaClass.simpleName)
 
             if (item is BlockItem) {
-                itemJson.addProperty("block", BuiltInRegistries.BLOCK.getKey(item.block)?.path)
+                itemJson.addProperty("block", BuiltInRegistries.BLOCK.getKey(item.block).path)
             }
             if (item is StandingAndWallBlockItem) {
+                val wallBlockField = StandingAndWallBlockItem::class.java.getDeclaredField("wallBlock")
+                wallBlockField.isAccessible = true
                 itemJson.addProperty(
                     "wallBlock",
-                    BuiltInRegistries.BLOCK.getKey(item.javaClass.getField("wallBlock").get(item) as Block)?.path
+                    BuiltInRegistries.BLOCK.getKey(wallBlockField.get(item) as Block).path
                 )
             }
 
