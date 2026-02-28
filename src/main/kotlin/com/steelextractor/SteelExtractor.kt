@@ -17,7 +17,7 @@ import com.steelextractor.extractors.Packets
 import com.steelextractor.extractors.LevelEvents
 import com.steelextractor.extractors.SoundEvents
 import com.steelextractor.extractors.SoundTypes
-import com.steelextractor.extractors.OverworldBiomes
+import com.steelextractor.extractors.MultiNoiseBiomeParameters
 import com.steelextractor.extractors.BiomeHashes
 import com.steelextractor.extractors.ChunkStageHashes
 import net.minecraft.world.level.ChunkPos
@@ -68,7 +68,7 @@ object SteelExtractor : ModInitializer {
             SoundTypes(),
             SoundEvents(),
             SoundTypes(),
-            OverworldBiomes(),
+            MultiNoiseBiomeParameters(),
             BiomeHashes(),
             LevelEvents(),
             Tags()
