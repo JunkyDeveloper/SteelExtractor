@@ -24,10 +24,12 @@ object ChunkStageHashStorage {
         return trackedChunks.contains(pos)
     }
 
-    fun markReady(pos: ChunkPos) {
+    fun markReady(pos: ChunkPos): Boolean {
         if (trackedChunks.contains(pos) && readyChunks.add(pos)) {
             readyLatch?.countDown()
+            return true
         }
+        return false
     }
 
     fun waitForAllReady(timeoutSeconds: Long): Boolean {

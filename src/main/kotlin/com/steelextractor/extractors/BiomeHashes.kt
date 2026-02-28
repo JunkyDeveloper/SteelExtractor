@@ -6,19 +6,22 @@ import com.google.gson.JsonObject
 import com.steelextractor.SteelExtractor
 import net.minecraft.core.registries.Registries
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.Level
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator
 import net.minecraft.world.level.levelgen.RandomState
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
+import kotlin.random.Random
 
 class BiomeHashes : SteelExtractor.Extractor {
     private val logger = LoggerFactory.getLogger("steel-extractor-biome-hashes")
 
     companion object {
         const val SEED: Long = 13579
-        const val RADIUS: Int = 5
-        const val MIN_SECTION_Y: Int = -4
-        const val MAX_SECTION_Y: Int = 20
+        private const val CHUNK_SAMPLE_SEED: Long = 24680
+        private const val NUM_CHUNKS: Int = 128
+        private const val HALF_RANGE: Int = 625 // 10000 / 16 = 625 chunks per axis half
     }
 
     override fun fileName(): String {
@@ -30,45 +33,68 @@ class BiomeHashes : SteelExtractor.Extractor {
     override fun extract(server: MinecraftServer): JsonElement {
         val json = JsonObject()
         json.addProperty("seed", SEED)
-        json.addProperty("radius", RADIUS)
+        json.addProperty("chunk_sample_seed", CHUNK_SAMPLE_SEED)
+        json.addProperty("num_chunks", NUM_CHUNKS)
 
-        // Get the overworld dimension
-        val overworld = server.overworld()
-        val chunkGenerator = overworld.chunkSource.generator
+        val dimensions = mapOf(
+            "overworld" to server.overworld(),
+            "the_nether" to server.getLevel(Level.NETHER),
+            "the_end" to server.getLevel(Level.END)
+        )
 
-        // Get the biome source
+        for ((name, level) in dimensions) {
+            if (level == null) {
+                logger.warn("Dimension $name not available, skipping")
+                continue
+            }
+            json.add(name, extractDimension(server, level, name))
+        }
+
+        return json
+    }
+
+    private fun extractDimension(server: MinecraftServer, level: ServerLevel, name: String): JsonObject {
+        val dimJson = JsonObject()
+
+        val minSectionY = level.minSectionY
+        val maxSectionY = level.maxSectionY
+
+        dimJson.addProperty("min_section_y", minSectionY)
+        dimJson.addProperty("max_section_y", maxSectionY)
+
+        val chunkGenerator = level.chunkSource.generator
         val biomeSource = chunkGenerator.biomeSource
 
-        // Create RandomState with the test seed
         val noiseRegistry = server.registryAccess().lookupOrThrow(Registries.NOISE)
 
         val randomState = if (chunkGenerator is NoiseBasedChunkGenerator) {
             RandomState.create(chunkGenerator.generatorSettings().value(), noiseRegistry, SEED)
         } else {
-            logger.warn("Chunk generator is not NoiseBasedChunkGenerator, using world's RandomState")
-            overworld.chunkSource.randomState()
+            logger.warn("Chunk generator for $name is not NoiseBasedChunkGenerator, using level's RandomState")
+            level.chunkSource.randomState()
         }
 
         val climateSampler = randomState.sampler()
 
         val hashesArray = JsonArray()
 
-        for (chunkX in -RADIUS..RADIUS) {
-            for (chunkZ in -RADIUS..RADIUS) {
-                val hash = chunkBiomeHash(climateSampler, biomeSource, chunkX, chunkZ)
+        val rng = Random(CHUNK_SAMPLE_SEED)
+        for (i in 0 until NUM_CHUNKS) {
+            val chunkX = rng.nextInt(-HALF_RANGE, HALF_RANGE)
+            val chunkZ = rng.nextInt(-HALF_RANGE, HALF_RANGE)
+            val hash = chunkBiomeHash(climateSampler, biomeSource, chunkX, chunkZ, minSectionY, maxSectionY)
 
-                val entry = JsonArray()
-                entry.add(chunkX)
-                entry.add(chunkZ)
-                entry.add(hash)
-                hashesArray.add(entry)
-            }
+            val entry = JsonArray()
+            entry.add(chunkX)
+            entry.add(chunkZ)
+            entry.add(hash)
+            hashesArray.add(entry)
         }
 
-        json.add("hashes", hashesArray)
+        dimJson.add("hashes", hashesArray)
 
-        logger.info("Extracted biome hashes for ${hashesArray.size()} chunks (seed=$SEED, radius=$RADIUS)")
-        return json
+        logger.info("Extracted biome hashes for $name: ${hashesArray.size()} chunks (seed=$SEED, sampleSeed=$CHUNK_SAMPLE_SEED)")
+        return dimJson
     }
 
     /**
@@ -81,13 +107,15 @@ class BiomeHashes : SteelExtractor.Extractor {
         climateSampler: net.minecraft.world.level.biome.Climate.Sampler,
         biomeSource: net.minecraft.world.level.biome.BiomeSource,
         chunkX: Int,
-        chunkZ: Int
+        chunkZ: Int,
+        minSectionY: Int,
+        maxSectionY: Int
     ): String {
         // Step 1: Sample biomes in generation order (X outer, Y middle, Z inner)
         // to match vanilla/Steel world generation cache behavior.
         val biomes = HashMap<BiomeKey, String>()
 
-        for (sectionY in MIN_SECTION_Y until MAX_SECTION_Y) {
+        for (sectionY in minSectionY..maxSectionY) {
             for (x in 0 until 4) {
                 for (y in 0 until 4) {
                     for (z in 0 until 4) {
@@ -109,7 +137,7 @@ class BiomeHashes : SteelExtractor.Extractor {
         // Step 2: Hash in deterministic Y,Z,X order with section markers.
         val md = MessageDigest.getInstance("MD5")
 
-        for (sectionY in MIN_SECTION_Y until MAX_SECTION_Y) {
+        for (sectionY in minSectionY..maxSectionY) {
             md.update(sectionY.toByte())
             for (y in 0 until 4) {
                 for (z in 0 until 4) {

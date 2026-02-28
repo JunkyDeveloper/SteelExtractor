@@ -21,6 +21,7 @@ import com.steelextractor.extractors.MultiNoiseBiomeParameters
 import com.steelextractor.extractors.BiomeHashes
 import com.steelextractor.extractors.ChunkStageHashes
 import net.minecraft.world.level.ChunkPos
+import net.minecraft.world.level.Level
 import net.minecraft.world.level.chunk.status.ChunkStatus
 import com.steelextractor.extractors.Potions
 import com.steelextractor.extractors.Tags
@@ -114,12 +115,30 @@ object SteelExtractor : ModInitializer {
             logger.info("Immediate extractors done, took ${timeInMillis}ms")
             logger.info("Forcing generation of ${(TRACKING_RADIUS * 2 + 1) * (TRACKING_RADIUS * 2 + 1)} chunks...")
 
-            val overworld = server.overworld()
-            for (x in -TRACKING_RADIUS..TRACKING_RADIUS) {
-                for (z in -TRACKING_RADIUS..TRACKING_RADIUS) {
-                    overworld.getChunk(x, z, ChunkStatus.FULL, true)
+            for (level in listOf(server.overworld(), server.getLevel(Level.NETHER), server.getLevel(Level.END))) {
+                if (level == null) continue
+                for (x in -TRACKING_RADIUS..TRACKING_RADIUS) {
+                    for (z in -TRACKING_RADIUS..TRACKING_RADIUS) {
+                        level.getChunk(x, z, ChunkStatus.FULL, true)
+                    }
                 }
             }
+
+            // Mark any chunks that were loaded from disk (not freshly generated)
+            // as ready, since the mixin only fires during generation.
+            var manuallyMarked = 0
+            for (x in -TRACKING_RADIUS..TRACKING_RADIUS) {
+                for (z in -TRACKING_RADIUS..TRACKING_RADIUS) {
+                    val pos = ChunkPos(x, z)
+                    if (ChunkStageHashStorage.markReady(pos)) {
+                        manuallyMarked++
+                    }
+                }
+            }
+            if (manuallyMarked > 0) {
+                logger.warn("$manuallyMarked chunks were loaded from disk (no intermediate stage hashes). Delete the world folder for full tracking.")
+            }
+
             logger.info("Chunk generation forced, waiting for completion...")
         })
 
