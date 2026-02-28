@@ -36,6 +36,11 @@ class BiomeHashes : SteelExtractor.Extractor {
         json.addProperty("chunk_sample_seed", CHUNK_SAMPLE_SEED)
         json.addProperty("num_chunks", NUM_CHUNKS)
 
+        val worldSeed = server.overworld().seed
+        if (worldSeed != SEED) {
+            logger.warn("World seed is $worldSeed, not $SEED! The End biome hashes will be based on the world seed, not SEED. Set level-seed=$SEED in server.properties and delete the world folder.")
+        }
+
         val dimensions = mapOf(
             "overworld" to server.overworld(),
             "the_nether" to server.getLevel(Level.NETHER),
