@@ -24,6 +24,7 @@ import net.minecraft.world.level.ChunkPos
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.chunk.status.ChunkStatus
 import com.steelextractor.extractors.Potions
+import com.steelextractor.extractors.StructureStarts
 import com.steelextractor.extractors.Tags
 import kotlinx.io.IOException
 import net.fabricmc.api.ModInitializer
@@ -72,7 +73,8 @@ object SteelExtractor : ModInitializer {
             MultiNoiseBiomeParameters(),
             BiomeHashes(),
             LevelEvents(),
-            Tags()
+            Tags(),
+            StructureStarts()
         )
 
         val chunkStageExtractor = ChunkStageHashes()
