@@ -24,6 +24,8 @@ class ChunkStageHashes : SteelExtractor.Extractor {
 
         val worldSeed = server.overworld().seed
         json.addProperty("seed", worldSeed)
+        json.addProperty("chunk_sample_seed", SteelExtractor.CHUNK_SAMPLE_SEED)
+        json.addProperty("num_chunks", SteelExtractor.NUM_SAMPLE_CHUNKS)
 
         if (worldSeed != 13579L) {
             logger.warn("World seed is $worldSeed, not 13579! Set level-seed=13579 in server.properties and delete the world folder.")

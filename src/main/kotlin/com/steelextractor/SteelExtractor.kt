@@ -42,14 +42,24 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.random.Random
 import kotlin.system.measureTimeMillis
 
 object SteelExtractor : ModInitializer {
     private val logger = LoggerFactory.getLogger("steel-extractor")
-    private const val HALF_SIZE = 25
 
     /** Set to false to skip chunk generation and chunk stage hash extraction. */
     private const val ENABLE_CHUNK_EXTRACTION = true
+
+    /** Set to false to skip storing per-chunk block data in memory and writing binary dump files. */
+    private const val ENABLE_BINARY_DUMP = false
+
+    /** Sampling parameters: place random CLUSTER_SIZE x CLUSTER_SIZE clusters within a SAMPLE_HALF_RANGE*2 x SAMPLE_HALF_RANGE*2 area. */
+    const val CHUNK_SAMPLE_SEED: Long = 13580
+    private const val CLUSTER_SIZE: Int = 20 // 20x20 chunks per cluster
+    private const val NUM_CLUSTERS: Int = 25 // 25 clusters * 400 = 10,000 chunks
+    const val NUM_SAMPLE_CHUNKS: Int = NUM_CLUSTERS * CLUSTER_SIZE * CLUSTER_SIZE
+    private const val SAMPLE_HALF_RANGE: Int = 50_000 // 100,000x100,000 chunk area
 
     override fun onInitialize() {
         logger.info("Hello Fabric world!")
@@ -94,17 +104,32 @@ object SteelExtractor : ModInitializer {
             "minecraft:the_end" to Level.END
         )
 
-        if (ENABLE_CHUNK_EXTRACTION) {
-            ServerLifecycleEvents.SERVER_STARTING.register { _ ->
-                logger.info("Setting up chunk stage hash tracking (${HALF_SIZE * 2}x${HALF_SIZE * 2} chunks per dimension, ${dimensions.size} dimensions)")
-                val chunksToTrack = mutableSetOf<DimChunkPos>()
-                for ((dimId, _) in dimensions) {
-                    for (x in -HALF_SIZE until HALF_SIZE) {
-                        for (z in -HALF_SIZE until HALF_SIZE) {
-                            chunksToTrack.add(DimChunkPos(ChunkPos(x, z), dimId))
-                        }
+        // Pre-compute sampled chunk positions: random cluster origins, each expanded to CLUSTER_SIZE x CLUSTER_SIZE
+        val sampledPositions = run {
+            val rng = Random(CHUNK_SAMPLE_SEED)
+            val positions = mutableListOf<ChunkPos>()
+            for (i in 0 until NUM_CLUSTERS) {
+                val originX = rng.nextInt(-SAMPLE_HALF_RANGE, SAMPLE_HALF_RANGE)
+                val originZ = rng.nextInt(-SAMPLE_HALF_RANGE, SAMPLE_HALF_RANGE)
+                for (dx in 0 until CLUSTER_SIZE) {
+                    for (dz in 0 until CLUSTER_SIZE) {
+                        positions.add(ChunkPos(originX + dx, originZ + dz))
                     }
                 }
+            }
+            positions
+        }
+
+        if (ENABLE_CHUNK_EXTRACTION) {
+            ServerLifecycleEvents.SERVER_STARTING.register { _ ->
+                logger.info("Setting up chunk stage hash tracking ($NUM_SAMPLE_CHUNKS sampled chunks from ${SAMPLE_HALF_RANGE * 2}x${SAMPLE_HALF_RANGE * 2} area, ${dimensions.size} dimensions)")
+                val chunksToTrack = mutableSetOf<DimChunkPos>()
+                for ((dimId, _) in dimensions) {
+                    for (pos in sampledPositions) {
+                        chunksToTrack.add(DimChunkPos(pos, dimId))
+                    }
+                }
+                ChunkStageHashStorage.enableBinaryDump = ENABLE_BINARY_DUMP
                 ChunkStageHashStorage.startTracking(chunksToTrack)
             }
         } else {
@@ -146,14 +171,12 @@ object SteelExtractor : ModInitializer {
 
         val dimWork = dimensions.map { (dimId, key) ->
             val queue = ArrayDeque<ChunkPos>()
-            for (x in -HALF_SIZE until HALF_SIZE) {
-                for (z in -HALF_SIZE until HALF_SIZE) {
-                    queue.add(ChunkPos(x, z))
-                }
+            for (pos in sampledPositions) {
+                queue.add(pos)
             }
             DimensionWork(key, dimId, queue)
         }
-        val chunksPerDim = HALF_SIZE * 2 * HALF_SIZE * 2
+        val chunksPerDim = sampledPositions.size
         val totalChunks = chunksPerDim * dimWork.size
         val chunksPerTick = 64
 
@@ -186,24 +209,19 @@ object SteelExtractor : ModInitializer {
                 var generated = 0
                 while (dim.chunkQueue.isNotEmpty() && generated < chunksPerTick) {
                     val pos = dim.chunkQueue.removeFirst()
-                    level.getChunk(pos.x, pos.z, ChunkStatus.FULL, true)
+                    level.getChunk(pos.x, pos.z, ChunkStatus.SURFACE, true)
                     generated++
                 }
 
                 val dimProgress = chunksPerDim - dim.chunkQueue.size
                 val overallProgress = currentDimIdx * chunksPerDim + dimProgress
-                if (dimProgress % (chunksPerTick * 10) == 0 || dim.chunkQueue.isEmpty()) {
-                    logger.info("Chunk generation progress: $overallProgress/$totalChunks (${dim.dimId}: $dimProgress/$chunksPerDim)")
-                }
+                logger.info("Chunk generation progress: $overallProgress/$totalChunks (${dim.dimId}: $dimProgress/$chunksPerDim)")
 
                 if (dim.chunkQueue.isEmpty()) {
                     // Mark any chunks loaded from disk as ready
-                    for (x in -HALF_SIZE until HALF_SIZE) {
-                        for (z in -HALF_SIZE until HALF_SIZE) {
-                            val pos = ChunkPos(x, z)
-                            if (ChunkStageHashStorage.markReady(pos, dim.dimId)) {
-                                manuallyMarked++
-                            }
+                    for (pos in sampledPositions) {
+                        if (ChunkStageHashStorage.markReady(pos, dim.dimId)) {
+                            manuallyMarked++
                         }
                     }
                     logger.info("Finished generating chunks for ${dim.dimId}")
@@ -233,10 +251,12 @@ object SteelExtractor : ModInitializer {
                 } catch (e: java.lang.Exception) {
                     logger.error("Extractor for \"${chunkStageExtractor.fileName()}\" failed.", e)
                 }
-                try {
-                    chunkStageExtractor.writeBinaryBlockData(outputDirectory)
-                } catch (e: java.lang.Exception) {
-                    logger.error("Binary block data extraction failed.", e)
+                if (ENABLE_BINARY_DUMP) {
+                    try {
+                        chunkStageExtractor.writeBinaryBlockData(outputDirectory)
+                    } catch (e: java.lang.Exception) {
+                        logger.error("Binary block data extraction failed.", e)
+                    }
                 }
                 logger.info("All extractors complete!")
             }

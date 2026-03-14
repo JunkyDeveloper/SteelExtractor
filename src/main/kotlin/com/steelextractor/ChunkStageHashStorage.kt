@@ -27,6 +27,10 @@ object ChunkStageHashStorage {
     @Volatile
     var currentDimension: String = ""
 
+    /** When false, block data is not stored in memory and binary dump is skipped. */
+    @Volatile
+    var enableBinaryDump: Boolean = false
+
     fun startTracking(chunks: Set<DimChunkPos>) {
         trackedChunks.addAll(chunks)
         readyLatch = CountDownLatch(chunks.size)
@@ -74,6 +78,29 @@ object ChunkStageHashStorage {
         trackedChunks.clear()
         readyChunks.clear()
         readyLatch = null
+    }
+
+    fun computeBlockHash(sections: Iterable<net.minecraft.world.level.chunk.LevelChunkSection>): String {
+        val md = MessageDigest.getInstance("MD5")
+        for (section in sections) {
+            if (section.hasOnlyAir()) {
+                md.update(0.toByte())
+            } else {
+                val states = section.states
+                for (y in 0 until 16) {
+                    for (z in 0 until 16) {
+                        for (x in 0 until 16) {
+                            val stateId = net.minecraft.world.level.block.Block.getId(states.get(x, y, z))
+                            md.update((stateId shr 24).toByte())
+                            md.update((stateId shr 16).toByte())
+                            md.update((stateId shr 8).toByte())
+                            md.update(stateId.toByte())
+                        }
+                    }
+                }
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
     }
 
     fun computeBlockHashWithData(sections: Iterable<net.minecraft.world.level.chunk.LevelChunkSection>): BlockHashResult {

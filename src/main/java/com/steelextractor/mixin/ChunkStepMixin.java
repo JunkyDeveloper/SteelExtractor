@@ -40,12 +40,17 @@ public class ChunkStepMixin {
 
         if (BLOCK_MODIFYING_STAGES.contains(this.targetStatus)) {
             LevelChunkSection[] sections = chunk.getSections();
-            BlockHashResult result = ChunkStageHashStorage.INSTANCE.computeBlockHashWithData(java.util.Arrays.asList(sections));
-            ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), result.getHash());
-            ChunkStageHashStorage.INSTANCE.storeBlockData(chunk.getPos(), dimension, this.targetStatus.toString(), result.getSectionData());
+            if (ChunkStageHashStorage.INSTANCE.getEnableBinaryDump()) {
+                BlockHashResult result = ChunkStageHashStorage.INSTANCE.computeBlockHashWithData(java.util.Arrays.asList(sections));
+                ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), result.getHash());
+                ChunkStageHashStorage.INSTANCE.storeBlockData(chunk.getPos(), dimension, this.targetStatus.toString(), result.getSectionData());
+            } else {
+                String hash = ChunkStageHashStorage.INSTANCE.computeBlockHash(java.util.Arrays.asList(sections));
+                ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), hash);
+            }
         }
 
-        if (this.targetStatus == ChunkStatus.FEATURES) {
+        if (this.targetStatus == ChunkStatus.SURFACE) {
             ChunkStageHashStorage.INSTANCE.markReady(chunk.getPos(), dimension);
         }
     }
