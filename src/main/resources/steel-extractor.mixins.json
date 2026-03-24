@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
 		"ExampleMixin",
-		"ChunkStepMixin"
+		"ChunkStepMixin",
+		"AxeItemAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1
