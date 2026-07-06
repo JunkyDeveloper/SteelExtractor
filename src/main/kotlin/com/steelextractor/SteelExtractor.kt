@@ -52,16 +52,17 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
 import kotlin.random.Random
+import kotlin.system.exitProcess
 import kotlin.system.measureTimeMillis
 
 object SteelExtractor : ModInitializer {
     private val logger = LoggerFactory.getLogger("steel-extractor")
 
     /** Set to false to skip chunk generation and chunk stage hash extraction. */
-    private const val ENABLE_CHUNK_EXTRACTION = true
+    private val ENABLE_CHUNK_EXTRACTION = envFlag("STEEL_EXTRACTOR_ENABLE_CHUNK_EXTRACTION")
 
     /** Set to false to skip storing per-chunk block data in memory and writing binary dump files. */
-    private const val ENABLE_BINARY_DUMP = true
+    private val ENABLE_BINARY_DUMP = envFlag("STEEL_EXTRACTOR_ENABLE_BINARY_DUMP")
 
     /** Sampling parameters: place random CLUSTER_SIZE x CLUSTER_SIZE clusters within a SAMPLE_HALF_RANGE*2 x SAMPLE_HALF_RANGE*2 area. */
     const val CHUNK_SAMPLE_SEED: Long = 123456
@@ -195,37 +196,47 @@ object SteelExtractor : ModInitializer {
         val test2 = BuiltInRegistries.FLUID.byId(2)
         logger.info(test2.toString())
 
-        val immediateExtractors = arrayOf(
-            Blocks(),
-            BlockEntities(),
-            Items(),
-            ParticleTypeRegistryExtractor(),
-            VillagerTypeRegistryExtractor(),
-            VillagerProfessionRegistryExtractor(),
-            Packets(),
-            MenuTypes(),
-            Entities(),
-            EntityEvents(),
-            Fluids(),
-            GameRulesExtractor(),
-            Classes(),
-            Attributes(),
-            MobEffects(),
-            Potions(),
-            SoundTypes(),
-            SoundEvents(),
-            MultiNoiseBiomeParameters(),
-            BiomeHashes(),
-            LevelEvents(),
-            Tags(),
-            StructureStarts(),
-            Strippables(),
-            Weathering(),
-            CandleCakes(),
-            Waxables(),
-            PoiTypesExtractor(),
-            GameEvents(),
-        )
+        // Build immediate extractors list conditionally. To disable a particular extractor,
+        // set the environment variable STEEL_EXTRACTOR_DISABLE_<NAME>=1 (or true/yes).
+        // Example: STEEL_EXTRACTOR_DISABLE_BLOCKS=1
+        val immediateExtractors = mutableListOf<Extractor>()
+        fun addUnlessDisabled(name: String, supplier: () -> Extractor) {
+            if (envFlag("STEEL_EXTRACTOR_DISABLE_$name")) {
+                logger.info("Extractor $name disabled via STEEL_EXTRACTOR_DISABLE_$name")
+            } else {
+                immediateExtractors.add(supplier())
+            }
+        }
+
+        addUnlessDisabled("BLOCKS") { Blocks() }
+        addUnlessDisabled("BLOCK_ENTITIES") { BlockEntities() }
+        addUnlessDisabled("ITEMS") { Items() }
+        addUnlessDisabled("PARTICLE_TYPES") { ParticleTypeRegistryExtractor() }
+        addUnlessDisabled("VILLAGER_TYPES") { VillagerTypeRegistryExtractor() }
+        addUnlessDisabled("VILLAGER_PROFESSIONS") { VillagerProfessionRegistryExtractor() }
+        addUnlessDisabled("PACKETS") { Packets() }
+        addUnlessDisabled("MENU_TYPES") { MenuTypes() }
+        addUnlessDisabled("ENTITIES") { Entities() }
+        addUnlessDisabled("ENTITY_EVENTS") { EntityEvents() }
+        addUnlessDisabled("FLUIDS") { Fluids() }
+        addUnlessDisabled("GAME_RULES") { GameRulesExtractor() }
+        addUnlessDisabled("CLASSES") { Classes() }
+        addUnlessDisabled("ATTRIBUTES") { Attributes() }
+        addUnlessDisabled("MOB_EFFECTS") { MobEffects() }
+        addUnlessDisabled("POTIONS") { Potions() }
+        addUnlessDisabled("SOUND_TYPES") { SoundTypes() }
+        addUnlessDisabled("SOUND_EVENTS") { SoundEvents() }
+        addUnlessDisabled("MULTI_NOISE_BIOME_PARAMETERS") { MultiNoiseBiomeParameters() }
+        addUnlessDisabled("BIOME_HASHES") { BiomeHashes() }
+        addUnlessDisabled("LEVEL_EVENTS") { LevelEvents() }
+        addUnlessDisabled("TAGS") { Tags() }
+        addUnlessDisabled("STRUCTURE_STARTS") { StructureStarts() }
+        addUnlessDisabled("STRIPPABLES") { Strippables() }
+        addUnlessDisabled("WEATHERING") { Weathering() }
+        addUnlessDisabled("CANDLE_CAKES") { CandleCakes() }
+        addUnlessDisabled("WAXABLES") { Waxables() }
+        addUnlessDisabled("POI_TYPES") { PoiTypesExtractor() }
+        addUnlessDisabled("GAME_EVENTS") { GameEvents() }
 
 
         val chunkStageExtractor = ChunkStageHashes()
@@ -302,6 +313,11 @@ object SteelExtractor : ModInitializer {
 
             if (!ENABLE_CHUNK_EXTRACTION) {
                 logger.info("All extractors complete! (chunk extraction skipped)")
+                if (envFlag("STEEL_EXTRACTOR_EXIT_ON_COMPLETE")) {
+                    logger.info("Exiting because STEEL_EXTRACTOR_EXIT_ON_COMPLETE is enabled")
+                    ServerLifecycleEvents.SERVER_STOPPING.invoker().onServerStopping(server);
+                    server.halt(false); // false means to do a graceful shutdown
+                }
             }
         })
 
@@ -568,6 +584,10 @@ object SteelExtractor : ModInitializer {
                     }
                 }
                 logger.info("All extractors complete!")
+                if (envFlag("STEEL_EXTRACTOR_EXIT_ON_COMPLETE")) {
+                    logger.info("Exiting because STEEL_EXTRACTOR_EXIT_ON_COMPLETE is enabled")
+                    exitProcess(0);
+                }
             }
         }
     }

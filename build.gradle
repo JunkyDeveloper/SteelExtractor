@@ -60,6 +60,7 @@ processResources {
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(25)
+		vendor = JvmVendorSpec.ADOPTIUM
 	}
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
