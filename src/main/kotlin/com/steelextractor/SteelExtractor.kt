@@ -22,6 +22,7 @@ import com.steelextractor.extractors.SoundTypes
 import com.steelextractor.extractors.MultiNoiseBiomeParameters
 import com.steelextractor.extractors.BiomeHashes
 import com.steelextractor.extractors.VillagerProfessionRegistryExtractor
+import com.steelextractor.extractors.MapDecorationTypeRegistryExtractor
 import com.steelextractor.extractors.VillagerTypeRegistryExtractor
 import com.steelextractor.extractors.CandleCakes
 import com.steelextractor.extractors.ChunkStageHashes
@@ -227,6 +228,7 @@ object SteelExtractor : ModInitializer {
         addUnlessDisabled("MOB_EFFECTS") { MobEffects() }
         addUnlessDisabled("POTIONS") { Potions() }
         addUnlessDisabled("SOUND_TYPES") { SoundTypes() }
+        addUnlessDisabled("MAP_DECORATION_TYPES") { MapDecorationTypeRegistryExtractor() }
         addUnlessDisabled("SOUND_EVENTS") { SoundEvents() }
         addUnlessDisabled("MULTI_NOISE_BIOME_PARAMETERS") { MultiNoiseBiomeParameters() }
         addUnlessDisabled("BIOME_HASHES") { BiomeHashes() }

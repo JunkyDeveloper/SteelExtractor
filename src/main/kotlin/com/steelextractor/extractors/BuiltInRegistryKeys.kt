@@ -11,6 +11,7 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.world.entity.npc.villager.VillagerProfession
 import net.minecraft.world.entity.npc.villager.VillagerType
+import net.minecraft.world.level.saveddata.maps.MapDecorationType
 
 private fun <T : Any> extractBuiltInRegistry(
     registry: Registry<T>,
@@ -36,6 +37,22 @@ class ParticleTypeRegistryExtractor : SteelExtractor.Extractor {
     override fun extract(server: MinecraftServer): JsonElement {
         return extractBuiltInRegistry(BuiltInRegistries.PARTICLE_TYPE) { particleType: ParticleType<*>, json ->
             json.addProperty("override_limiter", particleType.overrideLimiter)
+        }
+    }
+}
+
+class MapDecorationTypeRegistryExtractor : SteelExtractor.Extractor {
+    override fun fileName(): String {
+        return "steel-registry/build_assets/map_decoration_types.json"
+    }
+
+    override fun extract(server: MinecraftServer): JsonElement {
+        return extractBuiltInRegistry(BuiltInRegistries.MAP_DECORATION_TYPE) { type: MapDecorationType, json ->
+            json.addProperty("asset_id", type.assetId().toString())
+            json.addProperty("show_on_item_frame", type.showOnItemFrame())
+            json.addProperty("map_color", type.mapColor())
+            json.addProperty("exploration_map_element", type.explorationMapElement())
+            json.addProperty("track_count", type.trackCount())
         }
     }
 }
