@@ -8,6 +8,7 @@ import com.steelextractor.extractors.BlockEntities
 import com.steelextractor.extractors.Blocks
 import com.steelextractor.extractors.Entities
 import com.steelextractor.extractors.EntityEvents
+import com.steelextractor.extractors.DataComponents
 import com.steelextractor.extractors.Fluids
 import com.steelextractor.extractors.GameRulesExtractor
 import com.steelextractor.extractors.Items
@@ -210,6 +211,7 @@ object SteelExtractor : ModInitializer {
 
         addUnlessDisabled("BLOCKS") { Blocks() }
         addUnlessDisabled("BLOCK_ENTITIES") { BlockEntities() }
+        addUnlessDisabled("DATA_COMPONENTS") { DataComponents() }
         addUnlessDisabled("ITEMS") { Items() }
         addUnlessDisabled("PARTICLE_TYPES") { ParticleTypeRegistryExtractor() }
         addUnlessDisabled("VILLAGER_TYPES") { VillagerTypeRegistryExtractor() }
