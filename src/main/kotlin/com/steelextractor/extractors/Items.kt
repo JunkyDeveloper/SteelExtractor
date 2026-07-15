@@ -10,6 +10,7 @@ import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.RegistryOps
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.item.BlockItem
+import net.minecraft.world.item.Item
 import net.minecraft.world.item.SignItem
 import net.minecraft.world.item.StandingAndWallBlockItem
 import net.minecraft.world.level.block.Block
@@ -92,7 +93,18 @@ class Items : SteelExtractor.Extractor {
         }
 
 
+        val blockItemMappingsJson = JsonObject()
+        for (block in BuiltInRegistries.BLOCK) {
+            val item = Item.BY_BLOCK[block] ?: continue
+            blockItemMappingsJson.addProperty(
+                BuiltInRegistries.BLOCK.getKey(block).path,
+                BuiltInRegistries.ITEM.getKey(item).path
+            )
+        }
+
+
         topLevelJson.add("items", itemsJson)
+        topLevelJson.add("blockItemMappings", blockItemMappingsJson)
 
         return topLevelJson
     }
