@@ -407,7 +407,10 @@ class Blocks : SteelExtractor.Extractor {
         return resultJson
     }
 
-    private fun createSuffocatingPropertiesJson(block: Block): JsonObject {
+    private fun createStateBooleanPropertiesJson(
+        block: Block,
+        getValue: (BlockState) -> Boolean,
+    ): JsonObject {
         val resultJson = JsonObject()
         val possibleStates = block.stateDefinition.possibleStates
         if (possibleStates.isEmpty()) {
@@ -418,14 +421,10 @@ class Blocks : SteelExtractor.Extractor {
 
         val propertyCounts = LinkedHashMap<Boolean, Int>()
         for (state in possibleStates) {
-            propertyCounts.merge(
-                state.isSuffocating(EmptyBlockGetter.INSTANCE, BlockPos.ZERO),
-                1,
-                Int::plus
-            )
+            propertyCounts.merge(getValue(state), 1, Int::plus)
         }
 
-        var defaultValue = possibleStates[0].isSuffocating(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)
+        var defaultValue = getValue(possibleStates[0])
         var defaultCount = 0
         for ((value, count) in propertyCounts) {
             if (count > defaultCount) {
@@ -437,7 +436,7 @@ class Blocks : SteelExtractor.Extractor {
 
         val overwrites = JsonArray()
         for (i in possibleStates.indices) {
-            val currentValue = possibleStates[i].isSuffocating(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)
+            val currentValue = getValue(possibleStates[i])
             if (currentValue != defaultValue) {
                 val overwrite = JsonObject()
                 overwrite.addProperty("offset", i)
@@ -512,7 +511,6 @@ class Blocks : SteelExtractor.Extractor {
 
             behaviourJson.addProperty("liquid", getPrivateFieldValue<Boolean>(behaviourProps, "liquid"))
             behaviourJson.addProperty("isAir", getPrivateFieldValue<Boolean>(behaviourProps, "isAir"))
-            //behaviourJson.addProperty("isRedstoneConductor", getPrivateFieldValue<Boolean>(behaviourProps, "isRedstoneConductor"))
             //behaviourJson.addProperty("isSuffocating", getPrivateFieldValue<Boolean>(behaviourProps, "isSuffocating"))
             behaviourJson.addProperty(
                 "requiresCorrectToolForDrops",
@@ -540,7 +538,18 @@ class Blocks : SteelExtractor.Extractor {
             blockJson.add("interaction_shapes", shapesStructureJson.getAsJsonObject("interaction_shapes"))
             blockJson.add("visual_shapes", shapesStructureJson.getAsJsonObject("visual_shapes"))
             blockJson.add("light_properties", createLightPropertiesJson(block))
-            blockJson.add("suffocating", createSuffocatingPropertiesJson(block))
+            blockJson.add(
+                "suffocating",
+                createStateBooleanPropertiesJson(block) { state ->
+                    state.isSuffocating(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)
+                },
+            )
+            blockJson.add(
+                "redstone_conductor",
+                createStateBooleanPropertiesJson(block) { state ->
+                    state.isRedstoneConductor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)
+                },
+            )
 
             // Only add if there are actual differences
             if (behaviourJson.size() > 0) {
