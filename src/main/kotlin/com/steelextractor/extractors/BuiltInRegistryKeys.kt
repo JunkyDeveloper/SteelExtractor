@@ -6,12 +6,15 @@ import com.google.gson.JsonObject
 import com.steelextractor.SteelExtractor
 import net.minecraft.core.Registry
 import net.minecraft.core.particles.ParticleType
+import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.core.particles.SimpleParticleType
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.world.entity.npc.villager.VillagerProfession
 import net.minecraft.world.entity.npc.villager.VillagerType
 import net.minecraft.world.level.saveddata.maps.MapDecorationType
+import net.minecraft.world.level.gameevent.PositionSourceType
 
 private fun <T : Any> extractBuiltInRegistry(
     registry: Registry<T>,
@@ -37,6 +40,63 @@ class ParticleTypeRegistryExtractor : SteelExtractor.Extractor {
     override fun extract(server: MinecraftServer): JsonElement {
         return extractBuiltInRegistry(BuiltInRegistries.PARTICLE_TYPE) { particleType: ParticleType<*>, json ->
             json.addProperty("override_limiter", particleType.overrideLimiter)
+            json.addProperty("options_type", optionsType(particleType))
+        }
+    }
+
+    private fun optionsType(particleType: ParticleType<*>): String {
+        if (particleType is SimpleParticleType) {
+            return "simple"
+        }
+
+        return when (particleType) {
+            ParticleTypes.BLOCK,
+            ParticleTypes.BLOCK_MARKER,
+            ParticleTypes.FALLING_DUST,
+            ParticleTypes.DUST_PILLAR,
+            ParticleTypes.BLOCK_CRUMBLE -> "block"
+
+            ParticleTypes.ENTITY_EFFECT,
+            ParticleTypes.TINTED_LEAVES,
+            ParticleTypes.FLASH -> "color"
+
+            ParticleTypes.DUST -> "dust"
+            ParticleTypes.DUST_COLOR_TRANSITION -> "dust_color_transition"
+            ParticleTypes.GEYSER,
+            ParticleTypes.GEYSER_PLUME -> "geyser"
+
+            ParticleTypes.GEYSER_BASE,
+            ParticleTypes.GEYSER_POOF -> "geyser_base"
+
+            ParticleTypes.DRAGON_BREATH -> "power"
+            ParticleTypes.EFFECT,
+            ParticleTypes.INSTANT_EFFECT -> "spell"
+
+            ParticleTypes.ITEM -> "item"
+            ParticleTypes.SCULK_CHARGE -> "sculk_charge"
+            ParticleTypes.SHRIEK -> "shriek"
+            ParticleTypes.TRAIL -> "trail"
+            ParticleTypes.VIBRATION -> "vibration"
+            else -> error("Unknown parameterized particle type: ${BuiltInRegistries.PARTICLE_TYPE.getKey(particleType)}")
+        }
+    }
+}
+
+class PositionSourceTypeRegistryExtractor : SteelExtractor.Extractor {
+    override fun fileName(): String {
+        return "steel-registry/build_assets/position_source_types.json"
+    }
+
+    override fun extract(server: MinecraftServer): JsonElement {
+        return extractBuiltInRegistry(BuiltInRegistries.POSITION_SOURCE_TYPE) { positionSourceType: PositionSourceType<*>, _ ->
+            when (positionSourceType) {
+                PositionSourceType.BLOCK,
+                PositionSourceType.ENTITY -> Unit
+
+                else -> error(
+                    "Unknown position source type: ${BuiltInRegistries.POSITION_SOURCE_TYPE.getKey(positionSourceType)}"
+                )
+            }
         }
     }
 }

@@ -13,6 +13,7 @@ import com.steelextractor.extractors.Fluids
 import com.steelextractor.extractors.GameRulesExtractor
 import com.steelextractor.extractors.Items
 import com.steelextractor.extractors.ParticleTypeRegistryExtractor
+import com.steelextractor.extractors.PositionSourceTypeRegistryExtractor
 import com.steelextractor.extractors.MenuTypes
 import com.steelextractor.extractors.MobEffects
 import com.steelextractor.extractors.Packets
@@ -215,6 +216,7 @@ object SteelExtractor : ModInitializer {
         addUnlessDisabled("DATA_COMPONENTS") { DataComponents() }
         addUnlessDisabled("ITEMS") { Items() }
         addUnlessDisabled("PARTICLE_TYPES") { ParticleTypeRegistryExtractor() }
+        addUnlessDisabled("POSITION_SOURCE_TYPES") { PositionSourceTypeRegistryExtractor() }
         addUnlessDisabled("VILLAGER_TYPES") { VillagerTypeRegistryExtractor() }
         addUnlessDisabled("VILLAGER_PROFESSIONS") { VillagerProfessionRegistryExtractor() }
         addUnlessDisabled("PACKETS") { Packets() }
