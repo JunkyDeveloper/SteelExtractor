@@ -5,15 +5,16 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.steelextractor.SteelExtractor
 import net.minecraft.core.Holder
+import net.minecraft.core.particles.ColorParticleOption
+import net.minecraft.core.particles.SimpleParticleType
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
+import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.entity.ai.attributes.Attribute
 import net.minecraft.world.entity.ai.attributes.AttributeModifier
-import org.slf4j.LoggerFactory
 import java.lang.reflect.Field
 
 class MobEffects : SteelExtractor.Extractor {
-    private val logger = LoggerFactory.getLogger("steel-extractor-mob-effects")
     private val attributeModifiersField: Field = net.minecraft.world.effect.MobEffect::class.java
         .getDeclaredField("attributeModifiers")
         .apply { isAccessible = true }
@@ -26,6 +27,9 @@ class MobEffects : SteelExtractor.Extractor {
         .apply { isAccessible = true }
     private val attributeTemplateOperationField: Field = attributeTemplateClass
         .getDeclaredField("operation")
+        .apply { isAccessible = true }
+    private val colorParticleColorField: Field = ColorParticleOption::class.java
+        .getDeclaredField("color")
         .apply { isAccessible = true }
 
     override fun fileName(): String {
@@ -45,21 +49,89 @@ class MobEffects : SteelExtractor.Extractor {
             effectJson.addProperty("id", id)
             effectJson.addProperty("name", name)
 
-            try {
-                effectJson.addProperty("category", effect.category.name)
-                effectJson.addProperty("color", effect.color)
-                val attributeModifiers = extractAttributeModifiers(effect)
-                if (attributeModifiers.size() > 0) {
-                    effectJson.add("attribute_modifiers", attributeModifiers)
-                }
-            } catch (e: Exception) {
-                logger.warn("Failed to get info for " + name + ": " + e.message)
+            effectJson.addProperty("category", effect.category.name)
+            effectJson.addProperty("color", effect.color)
+            effectJson.add("particle", extractParticle(effect))
+            val attributeModifiers = extractAttributeModifiers(effect)
+            if (attributeModifiers.size() > 0) {
+                effectJson.add("attribute_modifiers", attributeModifiers)
             }
 
             effectsArray.add(effectJson)
         }
 
         return effectsArray
+    }
+
+    private fun extractParticle(effect: net.minecraft.world.effect.MobEffect): JsonObject {
+        val holder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect)
+        val regular = MobEffectInstance(holder, 1, 0, false, true).particleOptions
+        val ambient = MobEffectInstance(holder, 1, 0, true, true).particleOptions
+        val amplified = MobEffectInstance(holder, 1, 1, false, true).particleOptions
+        val typeKey = BuiltInRegistries.PARTICLE_TYPE.getKey(regular.type)
+            ?: error("Mob effect particle has an unregistered type: ${regular.type}")
+
+        check(ambient.type === regular.type && amplified.type === regular.type) {
+            "Mob effect particle type depends on instance state: ${BuiltInRegistries.MOB_EFFECT.getKey(effect)}"
+        }
+
+        val particleJson = JsonObject()
+        particleJson.addProperty("type", typeKey.toString())
+
+        when (regular) {
+            is SimpleParticleType -> {
+                check(ambient is SimpleParticleType && amplified is SimpleParticleType)
+                particleJson.addProperty("options_type", "simple")
+            }
+
+            is ColorParticleOption -> extractColorParticle(
+                effect,
+                regular,
+                ambient as? ColorParticleOption
+                    ?: error("Ambient mob effect particle options changed type"),
+                amplified as? ColorParticleOption
+                    ?: error("Amplified mob effect particle options changed type"),
+                particleJson
+            )
+
+            else -> error(
+                "Unsupported mob effect particle options ${regular::class.java.name} for " +
+                    BuiltInRegistries.MOB_EFFECT.getKey(effect)
+            )
+        }
+
+        return particleJson
+    }
+
+    private fun extractColorParticle(
+        effect: net.minecraft.world.effect.MobEffect,
+        regular: ColorParticleOption,
+        ambient: ColorParticleOption,
+        amplified: ColorParticleOption,
+        particleJson: JsonObject
+    ) {
+        val regularColor = colorParticleColorField.getInt(regular)
+        val ambientColor = colorParticleColorField.getInt(ambient)
+        val amplifiedColor = colorParticleColorField.getInt(amplified)
+        val effectRgb = effect.color and 0x00ff_ffff
+
+        if (
+            regularColor and 0x00ff_ffff == effectRgb &&
+            ambientColor and 0x00ff_ffff == effectRgb &&
+            amplifiedColor == regularColor
+        ) {
+            particleJson.addProperty("options_type", "mob_effect_color")
+            particleJson.addProperty("regular_alpha", regularColor ushr 24)
+            particleJson.addProperty("ambient_alpha", ambientColor ushr 24)
+            return
+        }
+
+        check(regularColor == ambientColor && regularColor == amplifiedColor) {
+            "Mob effect color particle depends on unsupported instance state: " +
+                BuiltInRegistries.MOB_EFFECT.getKey(effect)
+        }
+        particleJson.addProperty("options_type", "fixed_color")
+        particleJson.addProperty("color", regularColor)
     }
 
     @Suppress("UNCHECKED_CAST")
