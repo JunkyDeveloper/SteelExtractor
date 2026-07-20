@@ -17,7 +17,20 @@ class BlockEntities : SteelExtractor.Extractor {
 
         val blockEntitiesJson = JsonArray()
         for (blockEntity in BuiltInRegistries.BLOCK_ENTITY_TYPE) {
-            blockEntitiesJson.add(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity)!!.path)
+            val blockEntityJson = JsonObject()
+            blockEntityJson.addProperty(
+                "name",
+                BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity)!!.path,
+            )
+
+            val validBlocksJson = JsonArray()
+            for (block in BuiltInRegistries.BLOCK) {
+                if (blockEntity.isValid(block.defaultBlockState())) {
+                    validBlocksJson.add(BuiltInRegistries.BLOCK.getKey(block).path)
+                }
+            }
+            blockEntityJson.add("valid_blocks", validBlocksJson)
+            blockEntitiesJson.add(blockEntityJson)
         }
 
         topLevelJson.add("block_entity_types", blockEntitiesJson)
