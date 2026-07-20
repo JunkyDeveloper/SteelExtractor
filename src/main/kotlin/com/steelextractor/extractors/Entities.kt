@@ -537,6 +537,7 @@ class Entities : SteelExtractor.Extractor {
         flagsJson.addProperty("is_pushed_by_fluid", entity.isPushedByFluid())
         flagsJson.addProperty("can_freeze", entity.canFreeze())
         flagsJson.addProperty("can_be_hit_by_projectile", entity.canBeHitByProjectile())
+        flagsJson.addProperty("piston_push_reaction", entity.pistonPushReaction.name)
 
         if (entity is LivingEntity) {
             flagsJson.addProperty("is_sensitive_to_water", entity.isSensitiveToWater)
