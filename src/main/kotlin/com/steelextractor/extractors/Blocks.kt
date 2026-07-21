@@ -43,6 +43,12 @@ class Blocks : SteelExtractor.Extractor {
         val useShapeForLightOcclusion: Boolean,
     )
 
+    private data class StateFluidProperties(
+        val fluid: String,
+        val amount: Int,
+        val falling: Boolean,
+    )
+
     private data class ShapeData(
         val defaultAabbs: List<AABB>,
         val defaultIdxs: JsonArray,
@@ -407,6 +413,60 @@ class Blocks : SteelExtractor.Extractor {
         return resultJson
     }
 
+    private fun stateFluidProperties(state: BlockState): StateFluidProperties {
+        val fluidState = state.fluidState
+        return StateFluidProperties(
+            BuiltInRegistries.FLUID.getKey(fluidState.type).path,
+            fluidState.amount,
+            fluidState.getOptionalValue(BlockStateProperties.FALLING).orElse(false),
+        )
+    }
+
+    private fun stateFluidPropertiesJson(properties: StateFluidProperties): JsonObject {
+        val json = JsonObject()
+        json.addProperty("fluid", properties.fluid)
+        json.addProperty("amount", properties.amount)
+        json.addProperty("falling", properties.falling)
+        return json
+    }
+
+    private fun createStateFluidPropertiesJson(block: Block): JsonObject {
+        val resultJson = JsonObject()
+        val possibleStates = block.stateDefinition.possibleStates
+        if (possibleStates.isEmpty()) {
+            resultJson.add("default", stateFluidPropertiesJson(StateFluidProperties("empty", 0, false)))
+            resultJson.add("overwrites", JsonArray())
+            return resultJson
+        }
+
+        val propertyCounts = LinkedHashMap<StateFluidProperties, Int>()
+        for (state in possibleStates) {
+            propertyCounts.merge(stateFluidProperties(state), 1, Int::plus)
+        }
+
+        var defaultProperties = stateFluidProperties(possibleStates[0])
+        var defaultCount = 0
+        for ((properties, count) in propertyCounts) {
+            if (count > defaultCount) {
+                defaultProperties = properties
+                defaultCount = count
+            }
+        }
+        resultJson.add("default", stateFluidPropertiesJson(defaultProperties))
+
+        val overwrites = JsonArray()
+        for (i in possibleStates.indices) {
+            val currentProperties = stateFluidProperties(possibleStates[i])
+            if (currentProperties != defaultProperties) {
+                val overwrite = stateFluidPropertiesJson(currentProperties)
+                overwrite.addProperty("offset", i)
+                overwrites.add(overwrite)
+            }
+        }
+        resultJson.add("overwrites", overwrites)
+        return resultJson
+    }
+
     private fun createStateBooleanPropertiesJson(
         block: Block,
         getValue: (BlockState) -> Boolean,
@@ -538,6 +598,11 @@ class Blocks : SteelExtractor.Extractor {
             blockJson.add("interaction_shapes", shapesStructureJson.getAsJsonObject("interaction_shapes"))
             blockJson.add("visual_shapes", shapesStructureJson.getAsJsonObject("visual_shapes"))
             blockJson.add("light_properties", createLightPropertiesJson(block))
+            blockJson.add("fluid_state", createStateFluidPropertiesJson(block))
+            blockJson.add(
+                "randomly_ticking",
+                createStateBooleanPropertiesJson(block) { state -> state.isRandomlyTicking },
+            )
             blockJson.add(
                 "suffocating",
                 createStateBooleanPropertiesJson(block) { state ->

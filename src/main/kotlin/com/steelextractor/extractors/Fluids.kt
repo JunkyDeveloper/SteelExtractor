@@ -96,6 +96,7 @@ class Fluids : SteelExtractor.Extractor {
 
                 behaviorJson.addProperty("is_empty", fluidState.isEmpty)
                 behaviorJson.addProperty("is_source", fluidState.isSource)
+                behaviorJson.addProperty("is_randomly_ticking", fluidState.isRandomlyTicking)
 
                 // Explosion resistance (protected method)
                 val explosionResistanceMethod = getProtectedMethod(fluid, "getExplosionResistance")
