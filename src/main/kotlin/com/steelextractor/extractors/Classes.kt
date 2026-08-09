@@ -5,8 +5,10 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.steelextractor.SteelExtractor
 import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.resources.ResourceKey
 import net.minecraft.server.MinecraftServer
 import net.minecraft.sounds.SoundEvent
+import net.minecraft.tags.TagKey
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EntitySpawnReason
 import net.minecraft.world.entity.EntityType
@@ -46,6 +48,8 @@ class Classes : SteelExtractor.Extractor {
             is Block -> BuiltInRegistries.BLOCK.getKey(value)?.path?.let { json.addProperty(key, it) }
             is Item -> BuiltInRegistries.ITEM.getKey(value)?.path?.let { json.addProperty(key, it) }
             is EntityType<*> -> BuiltInRegistries.ENTITY_TYPE.getKey(value)?.path?.let { json.addProperty(key, it) }
+            is ResourceKey<*> -> json.addProperty(key, value.identifier().path)
+            is TagKey<*> -> json.addProperty(key, value.location().path)
             else -> {
                 if (depth < 1) {
                     extractDeclaredFields(value, value.javaClass, json, key, depth + 1)
