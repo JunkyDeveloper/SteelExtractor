@@ -1,6 +1,5 @@
 package com.steelextractor.mixin;
 
-import com.steelextractor.BlockHashResult;
 import com.steelextractor.ChunkStageHashStorage;
 import net.minecraft.util.profiling.jfr.callback.ProfiledDuration;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -37,18 +36,8 @@ public class ChunkStepMixin {
 
         if (IMMEDIATE_HASH_STAGES.contains(this.targetStatus)) {
             LevelChunkSection[] sections = chunk.getSections();
-            if (ChunkStageHashStorage.INSTANCE.getEnableBinaryDump()) {
-                BlockHashResult result = ChunkStageHashStorage.INSTANCE.computeBlockHashWithData(java.util.Arrays.asList(sections));
-                ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), result.getHash());
-                ChunkStageHashStorage.INSTANCE.storeBlockData(chunk.getPos(), dimension, this.targetStatus.toString(), result.getSectionData());
-            } else {
-                String hash = ChunkStageHashStorage.INSTANCE.computeBlockHash(java.util.Arrays.asList(sections));
-                ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), hash);
-            }
-        }
-
-        if (this.targetStatus == ChunkStatus.FEATURES) {
-            ChunkStageHashStorage.INSTANCE.markReady(chunk.getPos(), dimension);
+            String hash = ChunkStageHashStorage.INSTANCE.computeBlockHash(java.util.Arrays.asList(sections));
+            ChunkStageHashStorage.INSTANCE.storeHash(chunk.getPos(), dimension, this.targetStatus.toString(), hash);
         }
     }
 }

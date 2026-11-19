@@ -1,9 +1,7 @@
 package com.steelextractor.extractors
 
-import com.google.gson.JsonArray
-import com.google.gson.JsonElement
-import com.google.gson.JsonObject
-import com.steelextractor.SteelExtractor
+import com.google.gson.stream.JsonWriter
+import com.steelextractor.ChunkArea
 import net.minecraft.core.registries.Registries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
@@ -11,90 +9,90 @@ import net.minecraft.world.level.Level
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator
 import net.minecraft.world.level.levelgen.RandomState
 import net.minecraft.world.level.levelgen.densityfunction.SamplerContext
+import net.minecraft.resources.ResourceKey
 import org.slf4j.LoggerFactory
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 
-class BiomeHashes : SteelExtractor.Extractor {
+/**
+ * Streams per-chunk biome hashes for every chunk in [area] to `biome_hashes.json`, using the
+ * world seed. Output: `{seed, area, tile_size, num_chunks, "<dim>": {min_section_y, max_section_y,
+ * hashes: [[x, z, md5], ...]}}`, chunks in the same tile order as chunk_stage_hashes.json.
+ */
+class BiomeHashes(
+    private val area: ChunkArea,
+    private val dimensions: List<Pair<String, ResourceKey<Level>>>
+) {
     private val logger = LoggerFactory.getLogger("steel-extractor-biome-hashes")
-
-    companion object {
-        const val SEED: Long = 13579
-    }
-
-    override fun fileName(): String {
-        return "steel-core/test_assets/biome_hashes.json"
-    }
 
     private data class BiomeKey(val sectionY: Int, val x: Int, val y: Int, val z: Int)
 
-    override fun extract(server: MinecraftServer): JsonElement {
-        val json = JsonObject()
-        json.addProperty("seed", SEED)
-        json.addProperty("chunk_sample_seed", SteelExtractor.CHUNK_SAMPLE_SEED)
-        json.addProperty("num_chunks", SteelExtractor.NUM_SAMPLE_CHUNKS)
+    fun extract(server: MinecraftServer, outputDirectory: Path) {
+        val outputPath = outputDirectory.resolve(FILE_NAME)
+        Files.createDirectories(outputPath.parent)
+        val seed = server.overworld().seed
 
-        val worldSeed = server.overworld().seed
-        if (worldSeed != SEED) {
-            logger.warn("World seed is $worldSeed, not $SEED! The End biome hashes will be based on the world seed, not SEED. Set level-seed=$SEED in server.properties and delete the world folder.")
-        }
+        JsonWriter(Files.newBufferedWriter(outputPath, StandardCharsets.UTF_8)).use { w ->
+            w.beginObject()
+            w.name("seed").value(seed)
+            w.name("area"); area.writeJson(w)
+            w.name("tile_size").value(area.tileSize)
+            w.name("num_chunks").value(area.chunkCount)
 
-        val dimensions = mapOf(
-            "overworld" to server.overworld(),
-            "the_nether" to server.getLevel(Level.NETHER),
-            "the_end" to server.getLevel(Level.END)
-        )
-
-        for ((name, level) in dimensions) {
-            if (level == null) {
-                logger.warn("Dimension $name not available, skipping")
-                continue
+            for ((dimId, key) in dimensions) {
+                val level = server.getLevel(key)
+                if (level == null) {
+                    logger.warn("Dimension $dimId not available, skipping")
+                    continue
+                }
+                w.name(dimId.removePrefix("minecraft:"))
+                extractDimension(server, level, seed, w)
+                logger.info("Extracted biome hashes for $dimId (${area.chunkCount} chunks, seed=$seed)")
             }
-            json.add(name, extractDimension(server, level, name))
+            w.endObject()
         }
-
-        return json
+        logger.info("Wrote ${outputPath.toAbsolutePath()}")
     }
 
-    private fun extractDimension(server: MinecraftServer, level: ServerLevel, name: String): JsonObject {
-        val dimJson = JsonObject()
-
+    private fun extractDimension(server: MinecraftServer, level: ServerLevel, seed: Long, w: JsonWriter) {
         val minSectionY = level.minSectionY
         val maxSectionY = level.maxSectionY
 
-        dimJson.addProperty("min_section_y", minSectionY)
-        dimJson.addProperty("max_section_y", maxSectionY)
+        w.beginObject()
+        w.name("min_section_y").value(minSectionY)
+        w.name("max_section_y").value(maxSectionY)
 
         val chunkGenerator = level.chunkSource.generator
         val biomeSource = chunkGenerator.biomeSource
-
         val noiseRegistry = server.registryAccess().lookupOrThrow(Registries.NOISE)
 
         val randomState = if (chunkGenerator is NoiseBasedChunkGenerator) {
-            RandomState.create(noiseRegistry, SEED, chunkGenerator.generatorSettings().value())
+            RandomState.create(noiseRegistry, seed, chunkGenerator.generatorSettings().value())
         } else {
-            logger.warn("Chunk generator for $name is not NoiseBasedChunkGenerator, using level's RandomState")
+            logger.warn("Chunk generator for ${level.dimension()} is not NoiseBasedChunkGenerator, using level's RandomState")
             level.chunkSource.randomState()
         }
-
         val climateSampler = randomState.createClimateSampler(SamplerContext.EMPTY_UNCACHED)
 
-        val hashesArray = JsonArray()
-
-        val sampledPositions = SteelExtractor.sampledChunkPositions()
-        for (pos in sampledPositions) {
-            val hash = chunkBiomeHash(climateSampler, biomeSource, pos.x, pos.z, minSectionY, maxSectionY)
-
-            val entry = JsonArray()
-            entry.add(pos.x)
-            entry.add(pos.z)
-            entry.add(hash)
-            hashesArray.add(entry)
+        w.name("hashes").beginArray()
+        for (tile in area.tiles()) {
+            for (pos in tile) {
+                val hash = chunkBiomeHash(climateSampler, biomeSource, pos.x, pos.z, minSectionY, maxSectionY)
+                w.beginArray()
+                w.value(pos.x)
+                w.value(pos.z)
+                w.value(hash)
+                w.endArray()
+            }
         }
+        w.endArray()
+        w.endObject()
+    }
 
-        dimJson.add("hashes", hashesArray)
-
-        logger.info("Extracted biome hashes for $name: ${hashesArray.size()} chunks (seed=$SEED, sampleSeed=${SteelExtractor.CHUNK_SAMPLE_SEED})")
-        return dimJson
+    companion object {
+        const val FILE_NAME = "steel-core/test_assets/biome_hashes.json"
     }
 
     /**
